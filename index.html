@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dejt-rapport</title>
+<meta name="theme-color" content="#f4effa">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Caveat:wght@700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1f1b2e;
+    --muted: #6b6680;
+    --card: #ffffff;
+    --line: #e7e3ef;
+    --pink: #e8457a;
+    --green: #22a06b;
+    --purple: #6b4fd8;
+    --orange: #f08a24;
+    --blue: #2f7de1;
+    --bg1: #f6f1fb;
+    --bg2: #fdeef3;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { min-height: 100%; overflow-x: hidden; }
+  body {
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--ink);
+    background: linear-gradient(160deg, var(--bg1), var(--bg2));
+    transition: background .8s ease;
+  }
+  body.party  { --bg1: #fff6e5; --bg2: #ffe9ef; }
+  body.twist  { --bg1: #eef3ff; --bg2: #f3ecff; }
+  body.crisis { --bg1: #ecf2f8; --bg2: #efe9f6; }
+  body { background: linear-gradient(160deg, var(--bg1), var(--bg2)); }
+
+  #app { position: relative; z-index: 2; min-height: 100dvh; display: grid; place-items: center; }
+  #fx { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 1; }
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 60; }
+
+  .screen {
+    display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: 16px; width: 100%; min-height: 100dvh;
+    padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+    text-align: center;
+  }
+  .screen.active { display: flex; animation: enter .45s ease both; }
+  .screen.leaving { display: flex; animation: exit .25s ease both; }
+  @keyframes enter { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @keyframes exit  { to   { opacity: 0; transform: translateY(-10px); } }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 32px 22px 26px;
+    width: 100%; max-width: 440px;
+    box-shadow: 0 10px 30px rgba(31, 27, 46, .08);
+    display: flex; flex-direction: column; gap: 14px; align-items: center;
+  }
+  .tag {
+    font-size: .75rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--muted); background: #f3f0f8; border-radius: 999px; padding: 6px 12px;
+  }
+  .icon { font-size: 3rem; line-height: 1; }
+  h1 { font-size: clamp(1.7rem, 7.5vw, 2.4rem); line-height: 1.15; font-weight: 800; letter-spacing: -.02em; }
+  h2 { font-size: clamp(1.45rem, 6.2vw, 1.9rem); line-height: 1.2; font-weight: 800; letter-spacing: -.015em; }
+  p.lead { font-size: 1.08rem; color: var(--muted); line-height: 1.5; }
+
+  .btns { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 6px; }
+  button.big {
+    font-family: inherit; font-weight: 600; font-size: 1.05rem;
+    border: none; border-radius: 14px; padding: 15px 18px; width: 100%;
+    color: #fff; cursor: pointer;
+    background: var(--c, var(--pink));
+    box-shadow: 0 2px 0 rgba(0,0,0,.12);
+    transition: transform .15s ease, filter .15s ease;
+  }
+  button.big:hover { filter: brightness(1.06); transform: translateY(-1px); }
+  button.big:active { transform: translateY(1px); }
+  button.big:disabled { opacity: .55; cursor: default; transform: none; }
+  button.ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
+
+  button.restart {
+    font-family: inherit; font-weight: 500; font-size: .9rem; color: var(--muted);
+    background: transparent; border: none; padding: 10px 16px; cursor: pointer;
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+
+  /* Lugn guppande emoji */
+  .float { display: inline-block; animation: float 3.2s ease-in-out infinite; }
+  @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+  /* Kontrakt */
+  .modal {
+    position: fixed; inset: 0; background: rgba(31,27,46,.55); z-index: 50;
+    display: grid; place-items: center; padding: 16px;
+    opacity: 0; pointer-events: none; transition: opacity .25s;
+  }
+  .modal.open { opacity: 1; pointer-events: auto; }
+  .contract {
+    background: #fffdf7; border-radius: 14px; max-width: 420px; width: 100%;
+    padding: 26px 22px; text-align: left; position: relative;
+    box-shadow: 0 20px 50px rgba(0,0,0,.25); border: 1px solid #e8dfc8;
+    transform: translateY(12px); transition: transform .3s ease;
+    font-size: .98rem; line-height: 1.5; max-height: 90dvh; overflow-y: auto;
+  }
+  .modal.open .contract { transform: none; }
+  .contract h3 { text-align: center; font-size: 1.15rem; letter-spacing: .08em; margin-bottom: 10px; }
+  .contract ol { padding-left: 22px; margin: 10px 0 14px; display: grid; gap: 6px; }
+  .sigline { border-bottom: 1.5px solid var(--ink); height: 54px; position: relative; margin: 10px 0 4px; }
+  .sig {
+    font-family: "Caveat", cursive; font-size: 2.4rem; position: absolute; left: 6px; bottom: -6px;
+    color: #1d3fbb; white-space: nowrap; clip-path: inset(0 100% 0 0);
+  }
+  .signed .sig { animation: write 1.1s ease forwards; }
+  @keyframes write { to { clip-path: inset(0 0 0 0); } }
+  .stamp {
+    position: absolute; right: 18px; bottom: 120px; font-weight: 800; font-size: 1.1rem; letter-spacing: .08em;
+    color: #c62f3d; border: 3px solid #c62f3d; border-radius: 8px; padding: 2px 10px;
+    transform: rotate(-12deg) scale(1.6); opacity: 0; pointer-events: none;
+  }
+  .signed .stamp { animation: stamp .3s 1.1s ease-out forwards; }
+  @keyframes stamp { to { transform: rotate(-12deg) scale(1); opacity: .85; } }
+  .small { font-size: .82rem; color: var(--muted); }
+  .gone { display: none !important; }
+
+  /* Svävande dryck-emojis (krissidan) */
+  .drift {
+    position: absolute; font-size: 2rem; opacity: .55;
+    animation: drift var(--d, 18s) ease-in-out infinite alternate;
+  }
+  @keyframes drift {
+    from { transform: translate(var(--x0), var(--y0)) rotate(-12deg); }
+    to   { transform: translate(var(--x1), var(--y1)) rotate(12deg); }
+  }
+
+  /* Lyckohjul */
+  .wheel-wrap { position: relative; width: min(76vw, 290px); aspect-ratio: 1; margin: 8px 0 4px; }
+  .wheel-wrap canvas {
+    width: 100%; height: 100%; border-radius: 50%;
+    box-shadow: 0 0 0 5px #fff, 0 6px 20px rgba(0,0,0,.12);
+    transition: transform 4.2s cubic-bezier(.15,.75,.2,1);
+  }
+  .pointer {
+    position: absolute; top: -10px; left: 50%; transform: translateX(-50%); z-index: 2;
+    width: 0; height: 0; border-left: 13px solid transparent; border-right: 13px solid transparent;
+    border-top: 22px solid var(--ink);
+  }
+  .hub { position: absolute; inset: 0; margin: auto; width: 46px; height: 46px; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 6px rgba(0,0,0,.2); }
+  .result { font-size: 1.15rem; font-weight: 700; min-height: 1.5em; }
+  .result.show { animation: enter .4s ease both; }
+  .final { font-size: 1.05rem; font-weight: 600; background: #fff6d6; border: 1px solid #f3e2a0;
+    border-radius: 12px; padding: 14px; width: 100%; animation: enter .4s ease both; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+<div id="fx"></div>
+<canvas id="confetti"></canvas>
+
+<main id="app">
+
+  <!-- Start -->
+  <section class="screen active" id="s-start">
+    <div class="card">
+      <span class="tag">Konfidentiellt</span>
+      <h1>🚨 DEJT-RAPPORT 🚨</h1>
+      <p class="lead">Dags att avlägga rapport, soldat.</p>
+      <div class="btns">
+        <button class="big" style="--c:var(--pink)" data-go="s-q1">Starta förhöret</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Hur gick dejten? -->
+  <section class="screen" id="s-q1">
+    <div class="card">
+      <span class="tag">Fråga 1</span>
+      <div class="icon">🕵️</div>
+      <h2>Hur gick dejten?</h2>
+      <p class="lead">Svara ärligt. Vi ser allt.</p>
+      <div class="btns">
+        <button class="big" style="--c:var(--green)" data-go="s-q2">Det gick JÄTTEBRA 😍</button>
+        <button class="big" style="--c:var(--purple)" data-go="s-crisis">Det gick åt skogen 💀</button>
+      </div>
+    </div>
+    <button class="restart" data-restart>Börja om</button>
+  </section>
+
+  <!-- Dejt till? -->
+  <section class="screen" id="s-q2">
+    <div class="card">
+      <span class="tag">Fråga 2</span>
+      <div class="icon">👀</div>
+      <h2>Blir det en dejt till?</h2>
+      <div class="btns">
+        <button class="big" style="--c:var(--pink)" data-go="s-party">Vi är tillsammans nu ❤️</button>
+        <button class="big" style="--c:var(--blue)" data-go="s-twist">Jag kör på Maja istället 🔄</button>
+      </div>
+    </div>
+    <button class="restart" data-restart>Börja om</button>
+  </section>
+
+  <!-- Fest -->
+  <section class="screen" id="s-party">
+    <div class="card">
+      <div class="icon float">🥳</div>
+      <h1>LEGENDEN HAR LANDAT 🏆</h1>
+      <p class="lead">Respekt. Stor respekt.</p>
+      <div class="btns">
+        <button class="big" style="--c:var(--orange)" data-contract>Kräv detaljer på lördag</button>
+      </div>
+    </div>
+    <button class="restart" data-restart>Börja om</button>
+  </section>
+
+  <!-- Plot twist -->
+  <section class="screen" id="s-twist">
+    <div class="card">
+      <div class="icon float">🔄</div>
+      <h1>Plot twist 👀</h1>
+      <p class="lead">En dejt in och redan vidare. Det här kräver en ordentlig genomgång.</p>
+      <div class="btns">
+        <button class="big" style="--c:var(--orange)" data-contract>Kräv detaljer på lördag</button>
+      </div>
+    </div>
+    <button class="restart" data-restart>Börja om</button>
+  </section>
+
+  <!-- Kris -->
+  <section class="screen" id="s-crisis">
+    <div class="card">
+      <span class="tag">Operation Tröst 🚑</span>
+      <h1>Då kör vi Yaki på lördag.</h1>
+      <p class="lead">Snurra hjulet så bestämmer ödet resten.</p>
+      <div class="wheel-wrap">
+        <div class="pointer"></div>
+        <canvas id="wheel" width="600" height="600"></canvas>
+        <div class="hub"></div>
+      </div>
+      <div class="result" id="wheel-result"></div>
+      <div class="btns">
+        <button class="big" style="--c:var(--orange)" id="btn-spin">Snurra lyckohjulet</button>
+        <button class="big gone" style="--c:var(--green)" id="btn-in">Jag är med 🤝</button>
+      </div>
+      <div class="final gone" id="final">Bra. Glöm inte matlådan på torsdag heller. 🍱</div>
+    </div>
+    <button class="restart" data-restart>Börja om</button>
+  </section>
+
+</main>
+
+<!-- Kontrakt -->
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="ctitle">
+  <div class="contract" id="contract">
+    <h3 id="ctitle">📜 BINDANDE AVTAL</h3>
+    <p>Undertecknad (”Dejtaren”) förbinder sig härmed att på lördag:</p>
+    <ol>
+      <li>Redovisa <b>samtliga</b> detaljer. Inga ”det var bara mysigt”.</li>
+      <li>Visa minst en (1) skärmdump av konversationen.</li>
+      <li>Bjuda på första rundan som tack för det moraliska stödet.</li>
+      <li>Inte ställa in med motiveringen ”vi skulle ses igen”.</li>
+    </ol>
+    <p class="small">Avtalet kan ej sägas upp. Avtalsbrott bestraffas med karaoke.</p>
+    <div class="sigline"><span class="sig">Legenden himself</span></div>
+    <p class="small">Underskrift</p>
+    <div class="stamp">GODKÄNT</div>
+    <div class="btns" style="margin-top:16px">
+      <button class="big" style="--c:#1d3fbb" id="btn-sign">✍️ Tryck för att skriva under</button>
+      <button class="big gone" style="--c:var(--green)" id="btn-close">Avtal ingånget 🤝</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  let current = $('#s-start');
+  let busy = false;
+
+  // ---------- Navigering ----------
+  function go(id) {
+    const next = document.getElementById(id);
+    if (!next || next === current || busy) return;
+    busy = true;
+    current.classList.add('leaving');
+    setTimeout(() => {
+      current.classList.remove('active', 'leaving');
+      leave(current.id);
+      next.classList.add('active');
+      window.scrollTo({ top: 0 });
+      current = next;
+      enter(id);
+      busy = false;
+    }, 240);
+  }
+
+  function enter(id) {
+    document.body.classList.toggle('party', id === 's-party');
+    document.body.classList.toggle('twist', id === 's-twist');
+    document.body.classList.toggle('crisis', id === 's-crisis');
+    if (id === 's-party') confetti({ count: 90, colors: ['#e8457a','#f08a24','#f5c542','#22a06b','#2f7de1','#6b4fd8'] });
+    if (id === 's-twist') confetti({ count: 40, colors: ['#2f7de1','#6b4fd8','#9db8f0'] });
+    if (id === 's-crisis') startDrift();
+  }
+  function leave(id) {
+    if (id === 's-crisis') stopDrift();
+  }
+
+  $$('[data-go]').forEach(b => b.addEventListener('click', () => go(b.dataset.go)));
+  $$('[data-restart]').forEach(b => b.addEventListener('click', restart));
+
+  function restart() {
+    closeModal();
+    $('#wheel-result').textContent = '';
+    $('#btn-spin').classList.remove('gone');
+    $('#btn-spin').disabled = false;
+    $('#btn-spin').textContent = 'Snurra lyckohjulet';
+    $('#btn-in').classList.add('gone');
+    $('#final').classList.add('gone');
+    go('s-start');
+  }
+
+  // ---------- Konfetti (en lugn regnskur som tar slut) ----------
+  const cv = $('#confetti'), ctx = cv.getContext('2d');
+  let pieces = [], raf = null;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  function resize() { cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; }
+  addEventListener('resize', resize); resize();
+  function confetti({ count, colors, fromCenter = false }) {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    for (let i = 0; i < count; i++) {
+      pieces.push({
+        x: fromCenter ? cv.width / 2 : Math.random() * cv.width,
+        y: fromCenter ? cv.height * .45 : -Math.random() * cv.height * .6,
+        w: (5 + Math.random() * 5) * dpr,
+        h: (7 + Math.random() * 7) * dpr,
+        vx: fromCenter ? (Math.random() - .5) * 9 * dpr : (Math.random() - .5) * .8 * dpr,
+        vy: fromCenter ? (-Math.random() * 7 - 2) * dpr : (1.2 + Math.random() * 1.6) * dpr,
+        g: fromCenter ? .18 * dpr : 0,
+        r: Math.random() * Math.PI, vr: (Math.random() - .5) * .08,
+        c: colors[Math.floor(Math.random() * colors.length)]
+      });
+    }
+    if (!raf) loop();
+  }
+  function loop() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    pieces.forEach(p => {
+      p.vy += p.g; if (p.g && p.vy > 3 * dpr) p.vy = 3 * dpr;
+      p.y += p.vy; p.x += p.vx + Math.sin(p.y / 60) * .4; p.r += p.vr;
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r);
+      ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.r)) + 1);
+      ctx.restore();
+    });
+    pieces = pieces.filter(p => p.y < cv.height + 30);
+    if (pieces.length) raf = requestAnimationFrame(loop);
+    else { raf = null; ctx.clearRect(0, 0, cv.width, cv.height); }
+  }
+
+  // ---------- Kontrakt ----------
+  const modal = $('#modal'), contract = $('#contract');
+  $$('[data-contract]').forEach(b => b.addEventListener('click', () => {
+    contract.classList.remove('signed');
+    $('#btn-sign').classList.remove('gone');
+    $('#btn-close').classList.add('gone');
+    modal.classList.add('open');
+  }));
+  $('#btn-sign').addEventListener('click', () => {
+    contract.classList.add('signed');
+    $('#btn-sign').classList.add('gone');
+    setTimeout(() => {
+      $('#btn-close').classList.remove('gone');
+      confetti({ count: 70, colors: ['#1d3fbb','#c62f3d','#f5c542','#22a06b'], fromCenter: true });
+    }, 1400);
+  });
+  $('#btn-close').addEventListener('click', closeModal);
+  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+  function closeModal() { modal.classList.remove('open'); }
+
+  // ---------- Svävande drycker (krissidan) ----------
+  let driftEls = [];
+  function startDrift() {
+    stopDrift();
+    const emojis = ['🥃','🍾','🍺','🍻','🍺','🥂'];
+    const W = innerWidth - 40, H = innerHeight - 40;
+    emojis.forEach(e => {
+      const el = document.createElement('div');
+      el.className = 'drift';
+      el.textContent = e;
+      el.style.setProperty('--x0', Math.random() * W + 'px');
+      el.style.setProperty('--y0', Math.random() * H + 'px');
+      el.style.setProperty('--x1', Math.random() * W + 'px');
+      el.style.setProperty('--y1', Math.random() * H + 'px');
+      el.style.setProperty('--d', (14 + Math.random() * 10) + 's');
+      el.style.animationDelay = (-Math.random() * 14) + 's';
+      $('#fx').appendChild(el);
+      driftEls.push(el);
+    });
+  }
+  function stopDrift() { driftEls.forEach(el => el.remove()); driftEls = []; }
+
+  // ---------- Lyckohjul ----------
+  const options = [
+    ['Stå på dansgolvet och rizza', '🪩'],
+    ['Kebab kl 03', '🌯'],
+    ['Bira och dåliga beslut', '🍺'],
+    ['Nationalekonomi-gäda', '📈']
+  ];
+  const wcolors = ['#e8457a', '#f08a24', '#22a06b', '#6b4fd8'];
+  const wc = $('#wheel'), w = wc.getContext('2d');
+  const N = options.length, arc = 2 * Math.PI / N;
+
+  function wrap(text, maxW) {
+    const words = text.split(' '), lines = [];
+    let line = '';
+    words.forEach(word => {
+      const test = line ? line + ' ' + word : word;
+      if (w.measureText(test).width > maxW && line) { lines.push(line); line = word; }
+      else line = test;
+    });
+    lines.push(line);
+    return lines;
+  }
+
+  function drawWheel() {
+    const R = 300;
+    w.clearRect(0, 0, 600, 600);
+    options.forEach(([txt, emoji], i) => {
+      // segment i är centrerat i toppen när hjulet roterats -i*arc
+      const start = -Math.PI / 2 + i * arc - arc / 2;
+      w.beginPath(); w.moveTo(R, R); w.arc(R, R, R, start, start + arc); w.closePath();
+      w.fillStyle = wcolors[i]; w.fill();
+      w.strokeStyle = '#fff'; w.lineWidth = 5; w.stroke();
+
+      // text längs segmentets mittlinje, läsbar utifrån och in
+      w.save();
+      w.translate(R, R); w.rotate(start + arc / 2);
+      w.fillStyle = '#fff'; w.textBaseline = 'middle'; w.textAlign = 'center';
+      w.font = '42px sans-serif';
+      w.save(); w.translate(R - 50, 0); w.rotate(Math.PI / 2); w.fillText(emoji, 0, 0); w.restore();
+      w.font = '700 26px Inter, sans-serif';
+      w.font = '700 23px Inter, sans-serif';
+      const lines = wrap(txt.replace('-', '- '), 165).map(l => l.replace('- ', '-'));
+      const lh = 30;
+      w.translate(R - 175, 0); w.rotate(Math.PI / 2);
+      lines.forEach((l, k) => w.fillText(l, 0, (k - (lines.length - 1) / 2) * lh));
+      w.restore();
+    });
+  }
+  drawWheel();
+  if (document.fonts) document.fonts.ready.then(drawWheel);
+
+  let rotation = 0, spinning = false;
+  $('#btn-spin').addEventListener('click', () => {
+    if (spinning) return;
+    spinning = true;
+    const btn = $('#btn-spin'); btn.disabled = true;
+    const r = $('#wheel-result'); r.textContent = ''; r.classList.remove('show');
+    const pick = Math.floor(Math.random() * N);
+    const seg = 360 / N;
+    const jitter = (Math.random() - .5) * seg * .6;
+    const targetDeg = (360 - pick * seg + jitter) % 360;
+    const base = rotation - (rotation % 360);
+    rotation = base + 360 * 5 + targetDeg;
+    wc.style.transform = `rotate(${rotation}deg)`;
+    setTimeout(() => {
+      r.textContent = options[pick][1] + ' ' + options[pick][0];
+      void r.offsetWidth; r.classList.add('show');
+      btn.disabled = false; btn.textContent = 'Snurra igen';
+      $('#btn-in').classList.remove('gone');
+      spinning = false;
+    }, 4300);
+  });
+  $('#btn-in').addEventListener('click', () => {
+    $('#final').classList.remove('gone');
+    $('#btn-in').classList.add('gone');
+    $('#btn-spin').classList.add('gone');
+    $('#final').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+})();
+</script>
+</body>
+</html>
